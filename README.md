@@ -1,4 +1,4 @@
-# 🚀 Task Manager - Production-Ready Full-Stack Application
+# 🚀 Task Manager - Production-Ready Full-Stack Application By Nipun Sujesh
 
 ### Live
 - **Frontend**: [task-manager-pro-are3-drab.vercel.app](https://task-manager-pro-are3-drab.vercel.app)
@@ -317,21 +317,3 @@ docker-compose -f docker-compose.prod.yml up -d
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- React team for the amazing framework
-- MongoDB team for the flexible database
-- OpenAI for AI capabilities
-- All open-source contributors
-
-## 📞 Support
-
-- 📧 Email: support@taskmanager.com
-- 💬 Discord: [Join our community](https://discord.gg/taskmanager)
-- 📖 Documentation: [docs.taskmanager.com](https://docs.taskmanager.com)
-- 🐛 Issues: [GitHub Issues](https://github.com/your-repo/issues)
-
----
-
-**Built with ❤️ by the Task Manager Team**
