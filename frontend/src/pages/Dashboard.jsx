@@ -11,6 +11,7 @@ import {
   Target,
   Award
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { getTasks, getTaskAnalytics } from '../store/tasksSlice';
 import TaskCard from '../components/TaskCard';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -18,6 +19,7 @@ import { format, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 
 const Dashboard = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { tasks, isLoading, analytics } = useSelector((state) => state.tasks);
   const { user } = useSelector((state) => state.auth);
   const [selectedPeriod, setSelectedPeriod] = useState('7');
@@ -219,7 +221,10 @@ const Dashboard = () => {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             Recent Tasks
           </h2>
-          <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors">
+          <button
+            onClick={() => navigate('/tasks', { state: { openNewTask: true } })}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+          >
             <Plus className="w-4 h-4 mr-2" />
             New Task
           </button>
@@ -258,7 +263,10 @@ const Dashboard = () => {
         transition={{ delay: 0.6 }}
         className="grid grid-cols-1 md:grid-cols-3 gap-6"
       >
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 text-center">
+        <div
+          onClick={() => navigate('/tasks', { state: { openNewTask: true } })}
+          className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 text-center cursor-pointer hover:shadow"
+        >
           <div className="bg-blue-100 dark:bg-blue-900/20 p-3 rounded-full w-12 h-12 mx-auto mb-4">
             <Plus className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>

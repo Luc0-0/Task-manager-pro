@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { getTasks, createTask } from '../store/tasksSlice';
 import TaskCard from '../components/TaskCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import projectService from '../services/projectService';
+import TaskDrawer from '../components/TaskDrawer';
 
 const Tasks = () => {
   const dispatch = useDispatch();
   const { tasks, isLoading } = useSelector((state) => state.tasks);
   const { user } = useSelector((state) => state.auth);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -20,10 +24,21 @@ const Tasks = () => {
   });
   const [projects, setProjects] = useState([]);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeTask, setActiveTask] = useState(null);
 
   useEffect(() => {
     dispatch(getTasks());
   }, [dispatch]);
+
+  // Open New Task modal if navigated with state
+  useEffect(() => {
+    if (location.state && location.state.openNewTask) {
+      setIsModalOpen(true);
+      // clear state so back/refresh won't reopen
+      navigate('.', { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -65,7 +80,7 @@ const Tasks = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tasks.map((task) => (
-          <TaskCard key={task._id} task={task} />
+          <TaskCard key={task._id} task={task} onClick={() => { setActiveTask(task); setDrawerOpen(true); }} />
         ))}
       </div>
 
@@ -241,6 +256,23 @@ const Tasks = () => {
           </div>
         </div>
       )}
+
+      <TaskDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} task={activeTask}>
+        {activeTask && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">{activeTask.title}</h3>
+              {activeTask.description && (
+                <p className="mt-2 text-gray-600 dark:text-gray-300">{activeTask.description}</p>
+              )}
+            </div>
+            <div className="text-sm text-gray-500">
+              <div>Status: {activeTask.status}</div>
+              <div>Priority: {activeTask.priority}</div>
+            </div>
+          </div>
+        )}
+      </TaskDrawer>
     </div>
   );
 };
