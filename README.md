@@ -1,5 +1,10 @@
 # 🚀 Task Manager - Production-Ready Full-Stack Application
 
+### Live
+- **Frontend**: [task-manager-pro-are3-drab.vercel.app](https://task-manager-pro-are3-drab.vercel.app)
+- **Backend API**: [task-manager-pro-production.up.railway.app/api](https://task-manager-pro-production.up.railway.app/api)
+- **Health**: [task-manager-pro-production.up.railway.app/api/health](https://task-manager-pro-production.up.railway.app/api/health)
+
 A comprehensive task management application built with React, Node.js, and MongoDB. Features include real-time collaboration, AI-powered task creation, gamification, and advanced analytics.
 
 ## ✨ Features
