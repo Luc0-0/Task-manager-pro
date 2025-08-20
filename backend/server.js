@@ -5,6 +5,8 @@ const rateLimit = require('express-rate-limit');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
+const path = require('path');
+let Sentry;
 
 // Import database connection
 const connectDB = require('./config/database');
@@ -31,6 +33,21 @@ const io = socketIo(server, {
 // Security middleware
 app.use(helmet());
 
+// CORS (multi-origin, early and with preflight)
+const allowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || '').split(',').map(o => o.trim()).filter(Boolean);
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true
+};
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -42,11 +59,20 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS
-app.use(cors({
-  origin: process.env.CLIENT_URL || "http://localhost:3000",
-  credentials: true
-}));
+// Sentry (optional)
+try {
+  if (process.env.SENTRY_DSN_BACKEND) {
+    Sentry = require('@sentry/node');
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN_BACKEND,
+      environment: process.env.NODE_ENV || 'development',
+      tracesSampleRate: 0.2
+    });
+    app.use(Sentry.Handlers.requestHandler());
+  }
+} catch (e) {
+  console.warn('Sentry not initialized:', e.message);
+}
 
 // Body parser middleware
 app.use(express.json({ limit: '10mb' }));
@@ -113,6 +139,11 @@ app.use('*', (req, res) => {
     message: 'Route not found'
   });
 });
+
+// Sentry error handler (optional)
+if (Sentry && Sentry.Handlers) {
+  app.use(Sentry.Handlers.errorHandler());
+}
 
 // Global error handler
 app.use((err, req, res, next) => {
