@@ -22,6 +22,9 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
+// Import socket handlers
+const { authenticateSocket, setupSocketHandlers } = require('./utils/socketHandlers');
+
 // Socket.io setup
 const io = socketIo(server, {
   cors: {
@@ -29,6 +32,12 @@ const io = socketIo(server, {
     methods: ["GET", "POST"]
   }
 });
+
+// Socket.io authentication
+io.use(authenticateSocket);
+
+// Setup socket event handlers
+setupSocketHandlers(io);
 
 // Security middleware
 app.use(helmet());
@@ -50,8 +59,8 @@ app.options('*', cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
   message: {
     success: false,
     message: 'Too many requests from this IP, please try again later.'
@@ -78,45 +87,19 @@ try {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Socket.io middleware for authentication
-io.use((socket, next) => {
-  const token = socket.handshake.auth.token;
-  if (token) {
-    // Verify JWT token here if needed
-    socket.userId = socket.handshake.auth.userId;
-  }
-  next();
-});
-
-// Socket.io connection handling
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
-  
-  // Join user to their personal room
-  if (socket.userId) {
-    socket.join(`user_${socket.userId}`);
-  }
-
-  // Handle task updates
-  socket.on('task_updated', (data) => {
-    socket.broadcast.emit('task_updated', data);
-  });
-
-  // Handle project updates
-  socket.on('project_updated', (data) => {
-    socket.broadcast.emit('project_updated', data);
-  });
-
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-  });
-});
-
 // Make io accessible to routes
 app.use((req, res, next) => {
   req.io = io;
   next();
 });
+
+// Swagger Documentation
+const { swaggerUi, specs } = require('./utils/swagger');
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Task Manager Pro API Documentation'
+}));
 
 // Routes
 app.use('/api/auth', authRoutes);

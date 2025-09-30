@@ -1,0 +1,126 @@
+config:
+  target: 'http://localhost:5000'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 10
+      name: "Ramp up load"
+    - duration: 300
+      arrivalRate: 20
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 5
+      name: "Ramp down"
+  defaults:
+    headers:
+      Content-Type: 'application/json'
+
+scenarios:
+  - name: "User Registration and Login Flow"
+    weight: 30
+    flow:
+      - post:
+          url: "/api/auth/register"
+          json:
+            name: "{{ $randomString() }}"
+            email: "{{ $randomString() }}@example.com"
+            password: "TestPassword123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "{{ $randomString() }}@example.com"
+            password: "TestPassword123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+
+  - name: "Task Management Flow"
+    weight: 40
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "TestPassword123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      - get:
+          url: "/api/tasks"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      - post:
+          url: "/api/tasks"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            title: "{{ $randomString() }}"
+            description: "{{ $randomString() }}"
+            priority: "medium"
+            project: "{{ $randomString() }}"
+      
+      - get:
+          url: "/api/tasks/analytics"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+
+  - name: "Project Management Flow"
+    weight: 20
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "TestPassword123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      - get:
+          url: "/api/projects"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      - post:
+          url: "/api/projects"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            name: "{{ $randomString() }}"
+            description: "{{ $randomString() }}"
+            color: "#3B82F6"
+
+  - name: "Search and Filter Operations"
+    weight: 10
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            email: "test@example.com"
+            password: "TestPassword123"
+          capture:
+            - json: "$.data.token"
+              as: "authToken"
+      
+      - get:
+          url: "/api/tasks/search?q={{ $randomString() }}"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      - get:
+          url: "/api/tasks/overdue"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      
+      - get:
+          url: "/api/tasks/due-today"
+          headers:
+            Authorization: "Bearer {{ authToken }}"

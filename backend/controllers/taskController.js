@@ -329,78 +329,219 @@ const addComment = async (req, res) => {
 // @access  Private
 const getTaskAnalytics = async (req, res) => {
   try {
+    const analyticsService = require('../utils/analyticsService');
     const userId = req.user._id;
     const { period = '30' } = req.query;
     
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - parseInt(period));
-
-    // Task completion stats
-    const completionStats = await Task.aggregate([
-      {
-        $match: {
-          createdBy: userId,
-          createdAt: { $gte: startDate }
-        }
-      },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Priority distribution
-    const priorityStats = await Task.aggregate([
-      {
-        $match: {
-          createdBy: userId,
-          createdAt: { $gte: startDate }
-        }
-      },
-      {
-        $group: {
-          _id: '$priority',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
-
-    // Daily completion trend
-    const dailyStats = await Task.aggregate([
-      {
-        $match: {
-          createdBy: userId,
-          status: 'completed',
-          completedAt: { $gte: startDate }
-        }
-      },
-      {
-        $group: {
-          _id: {
-            $dateToString: {
-              format: '%Y-%m-%d',
-              date: '$completedAt'
-            }
-          },
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { '_id': 1 } }
-    ]);
+    const analytics = await analyticsService.getUserAnalytics(userId, parseInt(period));
+    const insights = await analyticsService.getProductivityInsights(userId, parseInt(period));
 
     res.json({
       success: true,
       data: {
-        completionStats,
-        priorityStats,
-        dailyStats,
-        period: parseInt(period)
+        ...analytics,
+        insights
       }
     });
   } catch (error) {
     console.error('Get analytics error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Bulk update tasks
+// @route   PATCH /api/tasks/bulk
+// @access  Private
+const bulkUpdateTasks = async (req, res) => {
+  try {
+    const { taskIds, updateData } = req.body;
+
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task IDs array is required'
+      });
+    }
+
+    // Verify all tasks belong to user
+    const tasks = await Task.find({
+      _id: { $in: taskIds },
+      $or: [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id }
+      ]
+    });
+
+    if (tasks.length !== taskIds.length) {
+      return res.status(403).json({
+        success: false,
+        message: 'Not authorized to update some tasks'
+      });
+    }
+
+    // Bulk update
+    const result = await Task.updateMany(
+      { _id: { $in: taskIds } },
+      { $set: updateData }
+    );
+
+    res.json({
+      success: true,
+      message: `${result.modifiedCount} tasks updated successfully`,
+      data: { modifiedCount: result.modifiedCount }
+    });
+  } catch (error) {
+    console.error('Bulk update error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Search tasks
+// @route   GET /api/tasks/search
+// @access  Private
+const searchTasks = async (req, res) => {
+  try {
+    const { q, project, status, priority, tags, page = 1, limit = 20 } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Search query must be at least 2 characters'
+      });
+    }
+
+    // Build search query
+    const query = {
+      $or: [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id }
+      ],
+      isArchived: false,
+      $text: { $search: q }
+    };
+
+    // Add filters
+    if (project) query.project = project;
+    if (status) query.status = status;
+    if (priority) query.priority = priority;
+    if (tags) query.tags = { $in: tags.split(',') };
+
+    const tasks = await Task.find(query)
+      .populate('project', 'name color')
+      .populate('assignedTo', 'name email avatar')
+      .populate('createdBy', 'name email avatar')
+      .sort({ score: { $meta: 'textScore' } })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Task.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: {
+        tasks,
+        pagination: {
+          page: parseInt(page),
+          pages: Math.ceil(total / limit),
+          total,
+          limit: parseInt(limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Search tasks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Get overdue tasks
+// @route   GET /api/tasks/overdue
+// @access  Private
+const getOverdueTasks = async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+
+    const query = {
+      $or: [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id }
+      ],
+      isArchived: false,
+      dueDate: { $lt: new Date() },
+      status: { $ne: 'completed' }
+    };
+
+    const tasks = await Task.find(query)
+      .populate('project', 'name color')
+      .populate('assignedTo', 'name email avatar')
+      .populate('createdBy', 'name email avatar')
+      .sort({ dueDate: 1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Task.countDocuments(query);
+
+    res.json({
+      success: true,
+      data: {
+        tasks,
+        pagination: {
+          page: parseInt(page),
+          pages: Math.ceil(total / limit),
+          total,
+          limit: parseInt(limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get overdue tasks error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+};
+
+// @desc    Get tasks due today
+// @route   GET /api/tasks/due-today
+// @access  Private
+const getTasksDueToday = async (req, res) => {
+  try {
+    const today = new Date();
+    const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+    const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+
+    const query = {
+      $or: [
+        { createdBy: req.user._id },
+        { assignedTo: req.user._id }
+      ],
+      isArchived: false,
+      dueDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'completed' }
+    };
+
+    const tasks = await Task.find(query)
+      .populate('project', 'name color')
+      .populate('assignedTo', 'name email avatar')
+      .populate('createdBy', 'name email avatar')
+      .sort({ priority: 1, dueDate: 1 });
+
+    res.json({
+      success: true,
+      data: { tasks }
+    });
+  } catch (error) {
+    console.error('Get tasks due today error:', error);
     res.status(500).json({
       success: false,
       message: 'Server error'
@@ -415,5 +556,9 @@ module.exports = {
   updateTask,
   deleteTask,
   addComment,
-  getTaskAnalytics
+  getTaskAnalytics,
+  bulkUpdateTasks,
+  searchTasks,
+  getOverdueTasks,
+  getTasksDueToday
 };
